@@ -10,7 +10,6 @@ with Alire.OS_Lib.Subprocess;
 with Alire.OS_Lib.Download;
 with Alire.Utils;
 with Alire.Utils.User_Input;
-with Alire.Config;
 with Alire.Config.Edit;
 
 with Alr.OS_Lib; use Alr.OS_Lib;
@@ -26,7 +25,7 @@ package body Alr.Platforms.Windows is
 
    Msys2_Installer_Script     : constant String := "auto-install.js";
    Msys2_Installer_Script_URL : constant String :=
-     "https://raw.githubusercontent.com/msys2/msys2-installer/master/" &
+     "https://raw.githubusercontent.com/msys2/msys2-installer/a588bcc/" &
      Msys2_Installer_Script;
 
    -------------------
@@ -87,7 +86,7 @@ package body Alr.Platforms.Windows is
                    Default  => No) = Yes
          then
             --  Save user choice in the global config
-            Cfg.Edit.Set (Path  => Cfg.Filepath (Cfg.Global),
+            Cfg.Edit.Set (Path  => Cfg.Edit.Filepath (Cfg.Global),
                           Key   => "msys2.do_not_install",
                           Value => "true");
          end if;
@@ -107,7 +106,7 @@ package body Alr.Platforms.Windows is
       use Alire.Utils;
 
       Install_Prefix : constant String :=
-        "InstallPrefix=" & Install_Dir;
+        "InstallDir=" & Install_Dir;
 
       Result : Alire.Outcome;
    begin
@@ -146,7 +145,7 @@ package body Alr.Platforms.Windows is
 
       if not Cfg.Defined ("msys2.install_dir") then
          --  Save msys2 install dir in the global config
-         Cfg.Edit.Set (Path  => Cfg.Filepath (Cfg.Global),
+         Cfg.Edit.Set (Path  => Cfg.Edit.Filepath (Cfg.Global),
                        Key   => "msys2.install_dir",
                        Value => Install_Dir);
       end if;

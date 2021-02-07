@@ -17,10 +17,14 @@ package Alire.Platforms with Preelaborate is
                           Ubuntu,
                           Msys2,
                           Arch,
+                          Rhel, -- RedHat Entreprise Linux
+                          Centos,
+                          Fedora,
                           Distro_Unknown);
 
    subtype Known_Distributions is
-     Distributions range Debian .. Distributions'Pred (Distributions'Last);
+     Distributions range Distributions'First ..
+                         Distributions'Pred (Distributions'Last);
 
    type Word_Sizes is (Bits_32,
                        Bits_64,
@@ -28,11 +32,15 @@ package Alire.Platforms with Preelaborate is
 
    type Package_Managers is (Apt,
                              Pacman,
+                             Yum,
+                             Dnf,
                              Packager_Unknown);
 
    Distro_Manager : constant array (Distributions) of Package_Managers :=
      (Debian | Ubuntu => Apt,
       Msys2 | Arch    => Pacman,
+      Rhel            => Yum,
+      Centos | Fedora => Dnf,
       Distro_Unknown  => Packager_Unknown);
 
    type Toolchains is (System,

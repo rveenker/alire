@@ -37,6 +37,12 @@ def prepare_env(config_dir, env):
     mkdir(config_dir)
     env['ALR_CONFIG'] = config_dir
 
+    # If distro detection is disabled via environment, configure so in alr
+    if "ALIRE_DISABLE_DISTRO" in env:
+        if env["ALIRE_DISABLE_DISTRO"] == "true":
+            run_alr("config", "--global",
+                    "--set", "distribution.disable_detection", "true")
+
 
 def run_alr(*args, **kwargs):
     """
@@ -162,6 +168,24 @@ name = '{}'
 priority = {}
 url = '{}'
             """.format(name, priority, os.path.join(working_dir, files_dir)))
+
+
+def index_branch():
+    """
+    Identify the expected index branch from `alr version`
+    """
+    p = run_alr("version", quiet=False)
+    for line in p.out.splitlines():
+        if line.startswith("community index"):
+            return line.split(':')[1].strip()
+    raise Exception("Unexpected alr output, cannot find index version")
+
+
+def index_version():
+    """
+    Identify the expected index version from `alr version`
+    """
+    return index_branch().split('-')[1]
 
 
 def init_local_crate(name="xxx", binary=True, enter=True):

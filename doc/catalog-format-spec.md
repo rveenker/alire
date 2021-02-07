@@ -187,29 +187,24 @@ static, i.e. they cannot depend on the context.
    maintainers-logins = ["alicehacks", "bobcoder"]
    ```
 
- - `licenses`: mandatory (for indexing) array of strings. Flat list of licenses
-   for the software that is packaged. The following licenses are allowed:
-
-   > -   `AFL 3.0`, `AGPL 3.0`, `Apache 2.0`, `Artistic 2.0`,
-   >     `BSD 2-Clauses`, `BSD 3-Clauses Clear`, `BSD 3-Clauses`,
-   >     `BSL 1.0`, `CC0 1.0`, `CC BY 4.0`, `CC BY-SA 4.0`, `ECL 2.0`,
-   >     `EPL 1.0`, `EPL 2.0`, `EUPL 1.1`, `EUPL 1.2`, `GPL 2.0`,
-   >     `GPL 3.0`, `ISC`, `LGPL 2.1`, `LGPL 3.0`, `LPPL 1.3c`, `MIT`,
-   >     `MPL 2.0`, `MS PL`, `MS RL`, `NCSA`, `OFL 1.1`, `OSL 3.0`,
-   >     `PostgreSQL`, `Unlicense`, `WTFPL`, `zlib`, `GMGPL 2.0`,
-   >     `GMGPL 3.0`, `Public Domain`.
-   > -   `Custom`, can be used for project specific licenses.
-
-   If the license is unknown or not in the list above, leave an empty array.
+ - `licenses`: mandatory (for indexing) string. A valid [SPDX
+   expression](https://spdx.org/licenses/). Custom license identifiers are
+   accepted with the format: `custom-[0-9a-zA-Z.-]+`
 
    ```toml
-   licenses = []
+   licenses = "MIT"
    ```
 
    For a double license:
 
    ```toml
-   licenses = ["GPL 3.0", "MIT"]
+   licenses = "GPL-3.0-only OR MIT"
+   ```
+
+   For a custom license:
+
+   ```toml
+   licenses = "custom-my-license-1.2"
    ```
 
  - `website`: optional string. URL to the original project's website. For
@@ -252,8 +247,17 @@ static, i.e. they cannot depend on the context.
 
    Available constraint operators are the usual Ada relationals (`=`, `/=`, `>`, `>=`,
    `<`, `<=`) plus caret (`^`, any upwards version within the same major point)
-   and tilde (\~, any upwards version within the same minor point). Logical
-   operators for and (&), or (|) are accepted; see the `Semantic_Versioning`
+   and tilde (\~, any upwards version within the same minor point). 
+
+   **Note that caret and tilde do not have any special behavior for pre-1
+   versions.** This means, for example, that `^0.2` will still mean any release
+   below `1.0`. The Semver specification does not make any promises about the
+   compatibility of pre-1 versions, and there are differing interpretations of
+   these operators out there for such versions. Bear in mind this when expressing
+   your restrictions; for pre-1 versions you most likely want to use `~0.x`
+   constraints (compatibility within a minor version).
+
+   Logical operators for and (&), or (|) are accepted; see the `Semantic_Versioning`
    project documentation on [extended version
    sets](https://github.com/alire-project/semantic_versioning#types).
 
@@ -339,32 +343,34 @@ static, i.e. they cannot depend on the context.
    command = <command>
    ```
 
-   `<command>` is a an array of strings for a shell command to run in the
+   `<command>` is an array of strings for a shell command to run in the
    source directory. `<kind>` can be either:
 
    - `post-fetch`: the command is to be run right after getting the package
-      sources
+      sources. This action is run for all releases in a workspace.
 
-   - `pre-build`: the command is to be run right before GPRbuild is run
+   - `pre-build`: the command is to be run right before GPRbuild is run. This
+      kind of action is run only for the root crate in a workspace.
 
    - `post-build`: the command is to be run right after GPRbuild has been
-      run
+      run. This kind of action is run only for the root crate in a workspace.
 
    - `test`: the command is run on demand for crate testing within the Alire 
-      ecosystem (using `alr test`).
+      ecosystem (using `alr test`). This kind of action is fun only for the
+      root crate being tested.
 
    Actions accept dynamic expressions. For example:
 
    ```toml
-   [[general.actions.'case(os)'.linux]]
+   [[actions.'case(os)'.linux]]
    type = "post-fetch"
    command = ["make"]
 
-   [[general.actions.'case(os)'.windows]]
+   [[actions.'case(os)'.windows]]
    type = "post-fetch"
    command = ["cmd", "build"]
 
-   [[general.actions.'case(os)'.'...']]
+   [[actions.'case(os)'.'...']]
    # An explicit empty case alternative, which is not mandatory
    ```
 

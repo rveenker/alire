@@ -4,6 +4,78 @@ This document is a development diary summarizing changes in `alr` that notably
 affect the user experience. It is intended as a one-stop point for users to
 stay on top of `alr` new features.
 
+## Release `1.0`
+
+### Narrow down versions for dependencies given without restrictions
+
+PR [#675](https://github.com/alire-project/alire/pull/675).
+
+When a user requests a dependency without narrowing down its version set (e.g.,
+`alr with foo`), the solved version will be used to instead add an
+"update-safe" dependency (e.g., `foo^1.x`, `foo~0.x`). To truly request any
+version, this can be explicitly entered as `alr with 'foo>=0'`.
+
+This behavior can be disabled by setting the `solver.autonarrow` configuration
+option to false.
+
+### The command `alr list` has been renamed to `alr search --crates`
+
+PR [#671](https://github.com/alire-project/alire/pull/671).
+
+To consolidate search functionality under the single `alr search` command, the
+old behavior of `alr list` can now be achieved with `alr search --crates`. By
+default, `alr search` looks into releases, but now it can look too into crates
+with the new `--crates` switch.
+
+### Document caret/tilde use for pre-1.0 versions, and warn about it
+
+PR [#669](https://github.com/alire-project/alire/pull/669).
+
+Alire does not change the meaning of caret (^) and tilde (~) operators for
+pre/post-1.0 versions. This interpretation has been clarified in the catalog
+specification, and `alr` will warn about any suspicious usage. This warning may
+be disabled by the user with the new `warning.caret` configuration option.
+
+### Do not perform build relocations
+
+PR [#667](https://github.com/alire-project/alire/pull/667).
+
+GPRBuild machinery for build relocation is incompatible with some use cases, so
+now all builds are performed in place, using the locations given in project
+files. This should only have a user-visible impact for pinned dependencies,
+which will see changes in their build directory when Alire builds for dependent
+crates are run.
+
+### Switch to check for unknown enumeration values in the index
+
+PR [#656](https://github.com/alire-project/alire/pull/656).
+
+To allow backwards-compatible use of new supported environment configurations
+in the index, unknown values in dynamic case expressions are silently ignored
+when loading an index. In order to allow pinpointing these values (or truly
+wrong entries), a new switch `alr index --check` can be used that will reject
+an index containing unknown values.
+
+This error, either in indexes or a local manifest, can be downgraded to a
+warning with `--force`.
+
+### Switch manifest `licenses` field to SPDX expressions
+
+PR [#629](https://github.com/alire-project/alire/pull/629).
+
+The `licenses` in crate manifests now expects a valid [SPDX
+expression](https://spdx.org/licenses/). Custom license identifiers are
+accepted with the format: `custom-[0-9a-zA-Z.-]+`.
+
+Example: 
+```toml 
+licenses = "MIT OR custom-my-own-license"
+```
+
+For the `1.x` release, usage of the previous `licenses` format is obsolete and
+will trigger a warning. In future major releases this format will not be
+accepted at all.
+
 ### Custom editor command for `alr edit`
 
 PR [#611](https://github.com/alire-project/alire/pull/611).
@@ -20,7 +92,7 @@ $ alr config --set --global editor.cmd "emacs ${GPR_FILE}"
 
 The default editor is still GNATstudio.
 
-
+## Release `0.7-beta`
 
 ### Assistance to generate and publish as tarball
 
