@@ -16,20 +16,21 @@ p = run_alr('show', 'hello')
 # Check a few substrings for more certainty:
 
 # Available
-assert_match(".*Available when: .case OS is LINUX => True, MACOS => False, "
-             "WINDOWS => .case Word_Size is BITS_32 => False, BITS_64 => True.*",
+assert_match(".*Available when: .case OS is Linux => True, "
+             "Windows => \(case Word_Size is Bits_64 => True, others => False\)"
+             ", others => False.*",
              p.out, flags=re.S)
 
 # Properties
 
-assert_match(".*case Word_Size is .* when Bits_32 => .Executable: hello32.*",
+assert_match(".*case Word_Size is .* when Bits_32 => Executable: hello32.*",
              p.out, flags=re.S)
 
-assert_match(".*case OS is .* when Linux => .GPR External: OS := linux.*",
+assert_match(".*case OS is .* when Linux => GPR External: OS := linux.*",
              p.out, flags=re.S)
 
 # Dependencies
-assert_match(".*Dependencies .direct.:.*case OS is.*when Linux => .libhello\^1.*",
+assert_match(".*Dependencies .direct.:.*case OS is.*when Linux => libhello\^1.*",
              p.out, flags=re.S)
 
 # Check that evaluation for the current platform does work
@@ -45,5 +46,17 @@ elif platform.system() == 'Darwin':
 else:
     assert_match(".*GPR External: OS := linux.*",
                  p.out, flags=re.S)
+
+# Check that a case given as "x|y" is properly loaded and shown
+p = run_alr("show", "hello=0.9")
+assert_match(
+    '.*'
+    'Properties:\n'
+    '   Description: "Hello, world!" demonstration project\n'
+    '   case OS is\n'
+    '      when Linux => Executable: hello\n'
+    '      when Windows => Executable: hello\n'
+    '.*',
+    p.out)
 
 print('SUCCESS')

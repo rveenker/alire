@@ -11,7 +11,6 @@ with Alire.Properties.Actions;
 with Alire.Properties.Environment;
 with Alire.Properties.Labeled;
 with Alire.Properties.Licenses;
-with Alire.Requisites;
 with Alire.TOML_Adapters;
 with Alire.TOML_Keys;
 with Alire.Utils;
@@ -40,7 +39,7 @@ package Alire.Releases is
                          Notes        : Description_String;
                          Dependencies : Conditional.Dependencies;
                          Properties   : Conditional.Properties;
-                         Available    : Alire.Requisites.Tree)
+                         Available    : Conditional.Availability)
                          return Release;
 
    function New_Empty_Release (Name : Crate_Name) return Release;
@@ -61,14 +60,6 @@ package Alire.Releases is
    --  For working releases that may have incomplete information. Note that the
    --  default properties are used by default.
 
-   function Extending
-     (Base         : Release;
-      Dependencies : Conditional.Dependencies := Conditional.No_Dependencies;
-      Properties   : Conditional.Properties   := Conditional.No_Properties;
-      Available    : Alire.Requisites.Tree    := Requisites.No_Requisites)
-      return Release;
-   --  Takes a release and merges given fields
-
    function Renaming (Base     : Release;
                       Provides : Crate_Name) return Release;
    --  Fills-in the "provides" field
@@ -88,11 +79,6 @@ package Alire.Releases is
    function Replacing
      (Base         : Release;
       Properties   : Conditional.Properties   := Conditional.No_Properties)
-      return Release;
-
-   function Replacing
-     (Base         : Release;
-      Available    : Alire.Requisites.Tree    := Requisites.No_Requisites)
       return Release;
 
    function Replacing (Base   : Release;
@@ -177,7 +163,7 @@ package Alire.Releases is
 
    function Origin  (R : Release) return Origins.Origin;
 
-   function Available (R : Release) return Requisites.Tree;
+   function Available (R : Release) return Conditional.Availability;
    function Is_Available (R : Release;
                           P : Alire.Properties.Vector) return Boolean;
    --  Evaluate R.Available under platform properties P
@@ -260,6 +246,9 @@ package Alire.Releases is
 
    function Tag (R : Release) return Alire.Properties.Vector;
 
+   function Config_Variables (R : Release) return Alire.Properties.Vector;
+   function Config_Settings (R : Release) return Alire.Properties.Vector;
+
    function Auto_GPR_With (R : Release) return Boolean;
 
    procedure Print (R : Release);
@@ -280,11 +269,13 @@ package Alire.Releases is
    --  wrapped as a dependency tree with a single value.
 
    function From_Manifest (File_Name : Any_Path;
-                           Source    : Manifest.Sources)
+                           Source    : Manifest.Sources;
+                           Strict    : Boolean)
                            return Release;
 
    function From_TOML (From   : TOML_Adapters.Key_Queue;
                        Source : Manifest.Sources;
+                       Strict : Boolean;
                        File   : Any_Path := "")
                        return Release
      with Pre => Source not in Manifest.Local or else File /= "";
@@ -294,6 +285,8 @@ package Alire.Releases is
    function To_TOML (R      : Release;
                      Format : Manifest.Sources)
                      return TOML.TOML_Value;
+   --  Convert the manifest to TOML. This is done currently only for a concrete
+   --  platform, hence R.Whenever should have been already called.
 
    overriding
    function To_YAML (R : Release) return String;
@@ -312,6 +305,14 @@ package Alire.Releases is
    function Check_Caret_Warning (This : Release) return Boolean;
    --  Check if this release contains a ^0.x dependency, and warn about it.
    --  Returns whether a warning was emitted.
+
+   procedure Deploy
+     (This            : Release;
+      Env             : Alire.Properties.Vector;
+      Parent_Folder   : String;
+      Was_There       : out Boolean;
+      Perform_Actions : Boolean := True);
+   --  Deploy the sources of this release under the given Parent_Folder
 
 private
 
@@ -337,12 +338,13 @@ private
       Dependencies : Conditional.Dependencies;
       Forbidden    : Conditional.Dependencies;
       Properties   : Conditional.Properties;
-      Available    : Requisites.Tree;
+      Available    : Conditional.Availability;
    end record;
 
    function From_TOML (This   : in out Release;
                        From   :        TOML_Adapters.Key_Queue;
                        Source :        Manifest.Sources;
+                       Strict :        Boolean;
                        File   :        Any_Path := "")
                        return Outcome
      with Pre => Source not in Manifest.Local or else File /= "";
@@ -400,12 +402,12 @@ private
    function Origin  (R : Release) return Origins.Origin
    is (R.Origin);
 
-   function Available (R : Release) return Requisites.Tree
+   function Available (R : Release) return Conditional.Availability
    is (R.Available);
 
    function Is_Available (R : Release;
                           P : Alire.Properties.Vector) return Boolean
-   is (R.Available.Check (P));
+   is (R.Available.Is_Available (P));
 
    function Description (R : Release) return Description_String
    --  Image returns "Description: Blah" so we have to cut.
@@ -441,6 +443,14 @@ private
    function Tag (R : Release) return Alire.Properties.Vector
    is (Conditional.Enumerate (R.Properties).Filter
        (Alire.TOML_Keys.Tag));
+
+   function Config_Variables (R : Release) return Alire.Properties.Vector
+   is (Conditional.Enumerate (R.Properties).Filter
+       (Alire.TOML_Keys.Config_Vars));
+
+   function Config_Settings (R : Release) return Alire.Properties.Vector
+   is (Conditional.Enumerate (R.Properties).Filter
+       (Alire.TOML_Keys.Config_Values));
 
    use all type Origins.Kinds;
    function Unique_Folder (R : Release) return Folder_String

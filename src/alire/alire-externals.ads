@@ -2,7 +2,6 @@ with Alire.Conditional;
 with Alire.Containers;
 with Alire.Platforms;
 with Alire.Properties;
-with Alire.Requisites;
 with Alire.TOML_Adapters;
 with Alire.Utils;
 
@@ -39,7 +38,7 @@ package Alire.Externals is
    --  Classwide helpers  --
    -------------------------
 
-   function Available (This : External'Class) return Requisites.Tree;
+   function Available (This : External'Class) return Conditional.Availability;
 
    type Kinds is (Hint,
                   --  A placeholder for a knowingly-unavailable crate, that
@@ -59,7 +58,9 @@ package Alire.Externals is
    --  These kinds are used during TOML loading, and exposed in the spec for
    --  documentation purposes only.
 
-   function From_TOML (From : TOML_Adapters.Key_Queue) return External'Class;
+   function From_TOML (From   : TOML_Adapters.Key_Queue;
+                       Strict : Boolean)
+                       return External'Class;
 
    function On_Platform (This : External'Class;
                          Env  : Properties.Vector) return External'Class;
@@ -69,7 +70,7 @@ private
 
    type External is abstract tagged record
       Properties : Conditional.Properties;
-      Available  : Requisites.Tree;
+      Available  : Conditional.Availability;
    end record;
 
 end Alire.Externals;

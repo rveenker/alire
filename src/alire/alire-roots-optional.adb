@@ -38,7 +38,8 @@ package body Alire.Roots.Optional is
                  Outcome_Success
                    (Roots.New_Root
                       (R    => Releases.From_Manifest (Crate_File,
-                                                       Manifest.Local),
+                                                       Manifest.Local,
+                                                       Strict => True),
                        Path => Ada.Directories.Full_Name (Path),
                        Env  => Alire.Root.Platform_Properties))
                do
@@ -48,6 +49,7 @@ package body Alire.Roots.Optional is
             exception
                when E : others =>
                   Trace.Debug ("Unloadable root found at " & Path);
+                  Log_Exception (E);
                   return Outcome_Failure
                     (Errors.Get (E),
                      Broken,
@@ -111,7 +113,9 @@ package body Alire.Roots.Optional is
    is
    begin
       This.Assert;
-      return Reference'(Ptr => This.Data.Value'Access);
+      --  The following Unrestricted_Access cannot fail as we just asserted
+      --  the value is stored.
+      return Reference'(Ptr => This.Data.Value'Unrestricted_Access);
    end Value;
 
    ---------------------

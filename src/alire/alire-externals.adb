@@ -5,7 +5,6 @@ with Alire.Externals.From_Output;
 with Alire.Externals.From_System;
 with Alire.Externals.Softlinks;
 with Alire.Externals.Unindexed;
-with Alire.Requisites.Booleans;
 with Alire.TOML_Keys;
 with Alire.TOML_Load;
 
@@ -17,14 +16,16 @@ package body Alire.Externals is
    -- Available --
    ---------------
 
-   function Available (This : External'Class) return Requisites.Tree is
-     (This.Available);
+   function Available (This : External'Class) return Conditional.Availability
+   is (This.Available);
 
    ---------------
    -- From_TOML --
    ---------------
 
-   function From_TOML (From : TOML_Adapters.Key_Queue) return External'Class is
+   function From_TOML (From   : TOML_Adapters.Key_Queue;
+                       Strict : Boolean)
+                       return External'Class is
 
       ---------------
       -- From_TOML --
@@ -77,7 +78,8 @@ package body Alire.Externals is
          --  Load common external fields
 
          TOML_Load.Load_Crate_Section
-           (Section => Crates.External_Private_Section,
+           (Strict  => Strict,
+            Section => Crates.External_Private_Section,
             From    => From,
             Props   => Ext.Properties,
             Deps    => Deps,
@@ -103,9 +105,7 @@ package body Alire.Externals is
                          Env  : Properties.Vector) return External'Class is
    begin
       return Ext : External'Class := This do
-         Ext.Available := (if Ext.Available.Check (Env)
-                           then Requisites.Booleans.Always_True
-                           else Requisites.Booleans.Always_False);
+         Ext.Available  := Ext.Available.Evaluate (Env);
          Ext.Properties := Ext.Properties.Evaluate (Env);
       end return;
    end On_Platform;

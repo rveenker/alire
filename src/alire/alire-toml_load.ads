@@ -1,6 +1,5 @@
 with Alire.Conditional;
 with Alire.Crates;
-with Alire.Requisites;
 with Alire.TOML_Adapters;
 
 with TOML;
@@ -17,11 +16,12 @@ package Alire.TOML_Load is
    function Load_File (File_Name : Any_Path) return TOML.TOML_Value;
    --  Will raise Checked_Error if file contents aren't valid TOML
 
-   procedure Load_Crate_Section (Section : Crates.Sections;
+   procedure Load_Crate_Section (Strict  : Boolean;
+                                 Section : Crates.Sections;
                                  From    : TOML_Adapters.Key_Queue;
                                  Props   : in out Conditional.Properties;
                                  Deps    : in out Conditional.Dependencies;
-                                 Avail   : in out Requisites.Tree);
+                                 Avail   : in out Conditional.Availability);
    --  Loads parts of a manifest, taking into account if we are loading
    --  a indexed release, a local release, a external shared section or
    --  a external private section.

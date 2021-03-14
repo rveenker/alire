@@ -3,8 +3,6 @@ private with TOML;
 with Alire.Index_On_Disk;
 with Alire.Crates;
 with Alire.Releases;
-with Alire.Requisites;
-with Alire.TOML_Adapters;
 
 with Semantic_Versioning;
 
@@ -25,8 +23,10 @@ package Alire.TOML_Index is
 
    procedure Load
      (Index    : Index_On_Disk.Index'Class;
+      Strict   : Boolean;
       Result   : out Load_Result);
-   --  Load the whole TOML catalog for the given index.
+   --  Load the whole TOML catalog for the given index. If Strict, don't allow
+   --  unknown enum values.
 
 private
 

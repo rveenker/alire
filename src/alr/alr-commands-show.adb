@@ -1,10 +1,10 @@
+with Alire.Conditional;
 with Alire.Dependencies;
 with Alire.Index;
 with Alire.Milestones;
 with Alire.Platform;
 with Alire.Platforms;
 with Alire.Releases;
-with Alire.Requisites.Booleans;
 with Alire.Root;
 with Alire.Roots.Optional;
 with Alire.Solutions;
@@ -12,7 +12,6 @@ with Alire.Solver;
 with Alire.Utils.Tables;
 
 with Alr.Platform;
-with Alr.Root;
 
 with Semantic_Versioning.Extended;
 
@@ -29,7 +28,7 @@ package body Alr.Commands.Show is
                      Versions : Semver.Extended.Version_Set;
                      Current  : Boolean;
                      --  session or command-line requested release
-                     Cmd      : Command)
+                     Cmd      : in out Command)
    is
    begin
       if Current then
@@ -43,7 +42,7 @@ package body Alr.Commands.Show is
 
          Rel     : constant Alire.Releases.Release  :=
                      (if Current
-                      then Root.Current.Release
+                      then Cmd.Root.Release
                       else Query.Find (Name, Versions, Query_Policy));
       begin
          if Cmd.System then
@@ -60,7 +59,7 @@ package body Alr.Commands.Show is
             declare
                Needed : constant Query.Solution :=
                           (if Current
-                           then Root.Current.Solution
+                           then Cmd.Root.Solution
                            else Query.Resolve
                              (Rel.Dependencies (Platform.Properties),
                               Platform.Properties,
@@ -131,12 +130,17 @@ package body Alr.Commands.Show is
                             (if Cmd.System
                              then Alire.Platform.Distribution
                              else Alire.Platforms.Distro_Unknown);
-               Available : constant Alire.Requisites.Tree :=
+               Available : Alire.Conditional.Availability :=
                              (if Cmd.System
                               then External.On_Platform
                                 (Platform.Properties).Available
                               else External.Available);
             begin
+               --  Improve the looks of a default Available
+               if Available.Is_Empty then
+                  Available := Alire.Conditional.Available_Default;
+               end if;
+
                for I in Detail.First_Index .. Detail.Last_Index loop
                   --  Skip last element, which is unknown distro
                   Table
@@ -148,9 +152,7 @@ package body Alr.Commands.Show is
                              else "")
                     .Append (Detail (I))
                     .Append (if I = Detail.First_Index
-                             then Alire.Requisites.Default_To
-                                  (Available,
-                                   Alire.Requisites.Booleans.Always_True).Image
+                             then Available.Image_One_Line
                              else "");
                   if I /= Detail.Last_Index then
                      Table.New_Row;
@@ -167,7 +169,8 @@ package body Alr.Commands.Show is
    -- Report_Jekyll --
    -------------------
 
-   procedure Report_Jekyll (Name     : Alire.Crate_Name;
+   procedure Report_Jekyll (Cmd      : in out Command;
+                            Name     : Alire.Crate_Name;
                             Versions : Semver.Extended.Version_Set;
                             Current  : Boolean)
    is
@@ -175,7 +178,7 @@ package body Alr.Commands.Show is
       declare
          Rel : constant Alire.Releases.Release  :=
            (if Current
-            then Root.Current.Release
+            then Cmd.Root.Release
             else Query.Find (Name, Versions, Query_Policy));
       begin
          Put_Line ("---");
@@ -209,7 +212,7 @@ package body Alr.Commands.Show is
             Reportaise_Wrong_Arguments
               ("Cannot proceed without a crate name");
          else
-            Requires_Valid_Session;
+            Cmd.Requires_Valid_Session;
          end if;
       end if;
 
@@ -223,7 +226,7 @@ package body Alr.Commands.Show is
       if Num_Arguments = 1 or else
         Cmd.Graph or else Cmd.Solve or else Cmd.Tree
       then
-         Requires_Full_Index;
+         Cmd.Requires_Full_Index;
       end if;
 
       declare
@@ -231,7 +234,7 @@ package body Alr.Commands.Show is
            (if Num_Arguments = 1
             then Alire.Milestones.Crate_Versions (Argument (1))
             else Alire.Milestones.Crate_Versions
-              (Root.Current.Release.Milestone.Image));
+              (Cmd.Root.Release.Milestone.Image));
       begin
          if Num_Arguments = 1 and not Alire.Index.Exists (Allowed.Crate) then
             raise Alire.Query_Unsuccessful;
@@ -243,7 +246,8 @@ package body Alr.Commands.Show is
 
          --  Execute
          if Cmd.Jekyll then
-            Report_Jekyll (Allowed.Crate,
+            Report_Jekyll (Cmd,
+                           Allowed.Crate,
                            Allowed.Versions,
                            Num_Arguments = 0);
          elsif Cmd.External then

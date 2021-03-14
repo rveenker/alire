@@ -1,4 +1,18 @@
+with Alire.Errors;
+
 package body Alire.TOML_Adapters is
+
+   --------------
+   -- Finalize --
+   --------------
+
+   overriding
+   procedure Finalize (This : in out Key_Queue) is
+      pragma Unreferenced (This);
+   begin
+      --  Manually close this error scope
+      Errors.Close;
+   end Finalize;
 
    ------------
    -- Assert --
@@ -35,8 +49,9 @@ package body Alire.TOML_Adapters is
    -------------------
 
    procedure Checked_Error (Queue : Key_Queue; Message : String) is
+      pragma Unreferenced (Queue);
    begin
-      raise Alire.Checked_Error with Errors.Set (Queue.Message (Message));
+      raise Alire.Checked_Error with Errors.Set (Message);
    end Checked_Error;
 
    -----------------------
@@ -49,7 +64,7 @@ package body Alire.TOML_Adapters is
    is
    begin
       if Recover then
-         Recoverable_Error (Queue.Message (Message), Recover);
+         Recoverable_Error (Message, Recover);
       else
          Queue.Checked_Error (Message);
       end if;
@@ -72,13 +87,34 @@ package body Alire.TOML_Adapters is
       end return;
    end Checked_Pop;
 
+   ------------------
+   -- Create_Table --
+   ------------------
+
+   function Create_Table (Key   : String;
+                          Value : TOML.TOML_Value)
+                          return TOML.TOML_Value
+   is
+   begin
+      return Table : constant TOML.TOML_Value := TOML.Create_Table do
+         Table.Set (Key, Value);
+      end return;
+   end Create_Table;
+
    ----------
    -- From --
    ----------
 
    function From (Value   : TOML.TOML_Value;
-                  Context : String) return Key_Queue is
-     (Value, +Context);
+                  Context : String) return Key_Queue
+   is
+   begin
+      return This : constant Key_Queue :=
+        (Ada.Finalization.Limited_Controlled with Value => Value)
+      do
+         Errors.Open (Context);
+      end return;
+   end From;
 
    ----------
    -- From --
@@ -87,12 +123,8 @@ package body Alire.TOML_Adapters is
    function From (Key     : String;
                   Value   : TOML.TOML_Value;
                   Context : String) return Key_Queue
-   is
-      Table : constant TOML.TOML_Value := TOML.Create_Table;
-   begin
-      Table.Set (Key, Value);
-      return From (Table, Context);
-   end From;
+   is (From (Create_Table (Key, Value),
+             Context));
 
    -------------
    -- Descend --
@@ -101,7 +133,7 @@ package body Alire.TOML_Adapters is
    function Descend (Parent  : Key_Queue;
                      Value   : TOML.TOML_Value;
                      Context : String) return Key_Queue is
-     (From (Value, (+Parent.Context) & ASCII.LF & Context));
+     (From (Value, Context));
 
    ---------
    -- Pop --
@@ -156,6 +188,19 @@ package body Alire.TOML_Adapters is
       else
          return False;
       end if;
+   end Pop;
+
+   ---------
+   -- Pop --
+   ---------
+
+   function Pop (Queue : Key_Queue; Key : String) return TOML.TOML_Value is
+      Val : TOML.TOML_Value;
+   begin
+      if not Queue.Pop (Key, Val) then
+         Raise_Checked_Error ("Requested key not found: " & Key);
+      end if;
+      return Val;
    end Pop;
 
    --------------
@@ -224,8 +269,7 @@ package body Alire.TOML_Adapters is
    function Report_Extra_Keys (Queue : Key_Queue) return Outcome
    is
       use UStrings;
-      Message  : UString := +Errors.Wrap (+Queue.Context,
-                                          "forbidden extra entries: ");
+      Message  : UString := +"forbidden extra entries: ";
       Is_First : Boolean := True;
       Errored  : Boolean := False;
    begin

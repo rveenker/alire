@@ -1,16 +1,22 @@
-with Alire.Errors;
+private with Ada.Finalization;
+
 with Alire.Utils;
 
 with TOML; use all type TOML.Any_Value_Kind;
 
 package Alire.TOML_Adapters with Preelaborate is
 
-   type Key_Queue is tagged private;
+   function Create_Table (Key   : String;
+                          Value : TOML.TOML_Value)
+                          return TOML.TOML_Value with
+     Pre  => (for all Char of Key => Char /= '.'),
+     Post => Create_Table'Result.Kind in TOML.TOML_Table;
+   --  Create a table with a single key and value
+
+   type Key_Queue is tagged limited private;
    --  Helper type that simplifies keeping track of processed keys during load.
    --  Also encapsulates a context that can be used to pinpoint errors better.
    --  Note: all operations on this type use shallow copies!
-
-   function Empty_Queue return Key_Queue;
 
    function From (Key     : String;
                   Value   : TOML.TOML_Value;
@@ -34,9 +40,6 @@ package Alire.TOML_Adapters with Preelaborate is
                      Context : String)
                      return Key_Queue;
    --  Use Parent for previous context, wrapping a key = value table.
-
-   function Message (Queue : Key_Queue; Message : String) return String;
-   --  Returns Queue's context & ": " & extra message.
 
    function Failure (Queue : Key_Queue; Message : String) return Outcome with
      Post => not Failure'Result.Success;
@@ -79,10 +82,13 @@ package Alire.TOML_Adapters with Preelaborate is
    --  Remove Key from the given set of keys and set Value to the
    --  corresponding value in Queue. Return whether Key was present.
 
+   function Pop (Queue : Key_Queue; Key : String) return TOML.TOML_Value;
+   --  Pop a key, that must exist, without checking its type (see Checked_Pop);
+
    function Pop_Expr (Queue  : Key_Queue;
                       Prefix : String;
                       Value  : out TOML.TOML_Value) return String;
-   --  Return a entry in the underlying table which key starts with Prefix,
+   --  Return a entry in the underlying table whose key starts with Prefix,
    --  or No_TOML_Value if not a table or does not contain such a key. The
    --  intended use is to process keys beginning with "case(" in the table.
 
@@ -91,8 +97,9 @@ package Alire.TOML_Adapters with Preelaborate is
                               Kind  : TOML.Any_Value_Kind) return String;
    --  For constructions like [parent.child.grandchild], where we known that
    --  only one child can exist. Will raise Checked_Error if any of these
-   --  happens: Queue is not a table; Queue doesn't have exactly one key;
-   --  Value is not of the expected Kind. Returns the single Key.
+   --  happens: Queue is not a table; Queue doesn't have exactly one key; Value
+   --  is not of the expected Kind. Returns the single key child. Value is set
+   --  to grandchild.
 
    function Unwrap (Queue : Key_Queue) return TOML.TOML_Value;
    --  Return the internal value as-is (with any already popped keys missing).
@@ -132,7 +139,8 @@ package Alire.TOML_Adapters with Preelaborate is
    --  Create a table with a single key=val entry
 
    function Adafy (Key : String) return String;
-   --  Take a toml key and replace every '-' and '.' with a '_';
+   --  Take a toml key and replace every '-' and '.' with a '_'; Use Title_Case
+   --  unless key = "others".
 
    function Tomify (Image : String) return String;
    --  Take some enumeration image and turn it into a TOML-style key, replacing
@@ -150,18 +158,12 @@ package Alire.TOML_Adapters with Preelaborate is
 
 private
 
-   type Key_Queue is tagged record
+   type Key_Queue is new Ada.Finalization.Limited_Controlled with record
       Value   : TOML.TOML_Value;
-      Context : UString;
    end record;
 
-   -----------------
-   -- Empty_Queue --
-   -----------------
-
-   function Empty_Queue return Key_Queue is
-     (Value   => TOML.No_TOML_Value,
-      Context => <>);
+   overriding
+   procedure Finalize (This : in out Key_Queue);
 
    ------------
    -- Unwrap --
@@ -174,38 +176,35 @@ private
    -- Descend --
    -------------
 
-   function Message (Queue : Key_Queue; Message : String) return String is
-     (Errors.Wrap (+Queue.Context, Message));
-
-   -------------
-   -- Descend --
-   -------------
-
    function Descend (Parent  : Key_Queue;
                      Key     : String;
                      Value   : TOML.TOML_Value;
                      Context : String)
                      return Key_Queue is
-      (From (Key, Value, Parent.Message (Context)));
+      (From (Key, Value, Context));
 
    -------------
    -- Failure --
    -------------
 
    function Failure (Queue : Key_Queue; Message : String) return Outcome is
-     (Outcome_Failure (Queue.Message (Message)));
+     (Outcome_Failure (Message));
 
    -----------
    -- Adafy --
    -----------
 
    function Adafy (Key : String) return String is
-     (Utils.Replace
+     (if Utils.To_Lower_Case (Key) = "others"
+      then Utils.To_Lower_Case (Key)
+      else
+      Utils.To_Mixed_Case
         (Utils.Replace
-             (Key,
-              Match => "-",
-              Subst => "_"),
-        Match => ".", Subst => "_"));
+             (Utils.Replace
+                  (Key,
+                   Match => "-",
+                   Subst => "_"),
+              Match => ".", Subst => "_")));
 
    ----------------------
    -- Tomify_As_String --

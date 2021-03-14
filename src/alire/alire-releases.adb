@@ -4,11 +4,12 @@ with Ada.Text_IO;
 
 with Alire.Config;
 with Alire.Crates;
+with Alire.Directories;
 with Alire.Defaults;
 with Alire.Errors;
+with Alire.Origins.Deployers;
 with Alire.Properties.Bool;
-with Alire.Requisites.Booleans;
-with Alire.TOML_Expressions;
+with Alire.Properties.Actions.Executor;
 with Alire.TOML_Load;
 with Alire.Utils.YAML;
 with Alire.Warnings;
@@ -90,26 +91,58 @@ package body Alire.Releases is
       return False;
    end Check_Caret_Warning;
 
-   ---------------
-   -- Extending --
-   ---------------
+   ------------
+   -- Deploy --
+   ------------
 
-   function Extending
-     (Base         : Release;
-      Dependencies : Conditional.Dependencies := Conditional.No_Dependencies;
-      Properties   : Conditional.Properties   := Conditional.No_Properties;
-      Available    : Alire.Requisites.Tree    := Requisites.No_Requisites)
-      return Release
+   procedure Deploy
+     (This            : Alire.Releases.Release;
+      Env             : Alire.Properties.Vector;
+      Parent_Folder   : String;
+      Was_There       : out Boolean;
+      Perform_Actions : Boolean := True)
    is
-      use all type Conditional.Dependencies;
-      use all type Requisites.Tree;
+      use Alire.OS_Lib.Operators;
+      use all type Alire.Properties.Actions.Moments;
+      Folder : constant Any_Path := Parent_Folder / This.Unique_Folder;
+      Result : Alire.Outcome;
    begin
-      return Extended : Release := Base do
-         Extended.Dependencies := Base.Dependencies and Dependencies;
-         Extended.Properties   := Base.Properties   and Properties;
-         Extended.Available    := Base.Available    and Available;
-      end return;
-   end Extending;
+
+      --  Deploy if the target dir is not already there
+
+      if Ada.Directories.Exists (Folder) then
+         Was_There := True;
+         Trace.Detail ("Skipping checkout of already available " &
+                         This.Milestone.Image);
+      else
+         Was_There := False;
+         Trace.Detail ("About to deploy " & This.Milestone.Image);
+         Result := Alire.Origins.Deployers.Deploy (This, Folder);
+         if not Result.Success then
+            Raise_Checked_Error (Message (Result));
+         end if;
+
+         --  For deployers that do nothing, we ensure the folder exists so all
+         --  dependencies leave a trace in the cache/dependencies folder, and
+         --  a place from where to run their actions by default.
+
+         Ada.Directories.Create_Path (Folder);
+      end if;
+
+      --  Run actions on first retrieval
+
+      if Perform_Actions and then not Was_There then
+         declare
+            use Alire.Directories;
+            Work_Dir : Guard (Enter (Folder)) with Unreferenced;
+         begin
+            Alire.Properties.Actions.Executor.Execute_Actions
+              (Release => This,
+               Env     => Env,
+               Moment  => Post_Fetch);
+         end;
+      end if;
+   end Deploy;
 
    ----------------
    -- Forbidding --
@@ -173,20 +206,6 @@ package body Alire.Releases is
    begin
       return Replaced : Release := Base do
          Replaced.Properties := Properties;
-      end return;
-   end Replacing;
-
-   ---------------
-   -- Replacing --
-   ---------------
-
-   function Replacing
-     (Base         : Release;
-      Available    : Alire.Requisites.Tree    := Requisites.No_Requisites)
-      return Release is
-   begin
-      return Replaced : Release := Base do
-         Replaced.Available := Available;
       end return;
    end Replacing;
 
@@ -259,7 +278,7 @@ package body Alire.Releases is
                          Notes        : Description_String;
                          Dependencies : Conditional.Dependencies;
                          Properties   : Conditional.Properties;
-                         Available    : Alire.Requisites.Tree)
+                         Available    : Conditional.Availability)
                          return Release
    is (Prj_Len      => Name.Length,
        Notes_Len    => Notes'Length,
@@ -303,7 +322,7 @@ package body Alire.Releases is
       Dependencies => Dependencies,
       Forbidden    => Conditional.For_Dependencies.Empty,
       Properties   => Properties,
-      Available    => Requisites.Trees.Empty_Tree -- empty evaluates to True
+      Available    => Conditional.Empty
      );
 
    -------------------------
@@ -559,13 +578,15 @@ package body Alire.Releases is
 
       --  AVAILABILITY
       if not R.Available.Is_Empty then
-         Put_Line ("Available when: " & R.Available.Image);
+         Put_Line ("Available when: " & R.Available.Image_One_Line);
       end if;
 
       --  PROPERTIES
       if not R.Properties.Is_Empty then
          Put_Line ("Properties:");
-         R.Properties.Print ("   ", False);
+         R.Properties.Print ("   ",
+                             And_Or  => False,
+                             Verbose => Alire.Log_Level >= Detail);
       end if;
 
       --  DEPENDENCIES
@@ -628,7 +649,8 @@ package body Alire.Releases is
    -------------------
 
    function From_Manifest (File_Name : Any_Path;
-                           Source    : Manifest.Sources)
+                           Source    : Manifest.Sources;
+                           Strict    : Boolean)
                            return Release
    is
    begin
@@ -637,9 +659,11 @@ package body Alire.Releases is
            (TOML_Load.Load_File (File_Name),
             "Loading release from manifest: " & File_Name),
          Source,
+         Strict,
          File_Name);
    exception
       when E : others =>
+         Log_Exception (E);
          --  As this file is edited manually, it may not load for many reasons
          Raise_Checked_Error (Errors.Wrap ("Failed to load " & File_Name,
                                            Errors.Get (E)));
@@ -651,6 +675,7 @@ package body Alire.Releases is
 
    function From_TOML (From   : TOML_Adapters.Key_Queue;
                        Source : Manifest.Sources;
+                       Strict : Boolean;
                        File   : Any_Path := "")
                        return Release is
    begin
@@ -659,7 +684,7 @@ package body Alire.Releases is
       return This : Release := New_Empty_Release
         (Name => +From.Unwrap.Get (TOML_Keys.Name).As_String)
       do
-         Assert (This.From_TOML (From, Source, File));
+         Assert (This.From_TOML (From, Source, Strict, File));
       end return;
    end From_TOML;
 
@@ -670,24 +695,14 @@ package body Alire.Releases is
    function From_TOML (This   : in out Release;
                        From   :        TOML_Adapters.Key_Queue;
                        Source :        Manifest.Sources;
+                       Strict :        Boolean;
                        File   :        Any_Path := "")
                        return Outcome
    is
       package Dirs    renames Ada.Directories;
       package Labeled renames Alire.Properties.Labeled;
-
-      Strict_Before : constant Boolean := TOML_Expressions.Strict_Enums;
-      --  Initial value of TOML_Expressions.Strict_Enums, to restore it after
-      --  loading this particular release.
    begin
       Trace.Debug ("Loading release " & This.Milestone.Image);
-
-      --  For local manifests we don't allow unknown enum values. For indexes
-      --  we do not complain, as that allows backward compatibility for new
-      --  configurations found in the index but unknown to this Alire. This way
-      --  local errors by the user are caught on the spot.
-      TOML_Expressions.Strict_Enums :=
-        TOML_Expressions.Strict_Enums or else Source in Manifest.Local;
 
       --  Origin
 
@@ -706,13 +721,14 @@ package body Alire.Releases is
       --  Properties
 
       TOML_Load.Load_Crate_Section
-        ((case Source is
-            when Manifest.Index => Crates.Index_Release,
-            when Manifest.Local => Crates.Local_Release),
-         From,
-         This.Properties,
-         This.Dependencies,
-         This.Available);
+        (Strict  => Strict or else Source in Manifest.Local,
+         Section => (case Source is
+                        when Manifest.Index => Crates.Index_Release,
+                        when Manifest.Local => Crates.Local_Release),
+         From    => From,
+         Props   => This.Properties,
+         Deps    => This.Dependencies,
+         Avail   => This.Available);
 
       --  Consolidate/validate some properties as fields:
 
@@ -721,28 +737,8 @@ package body Alire.Releases is
 
       This.Version := Semver.New_Version (This.Property (Labeled.Version));
 
-      --  Restore Strict-ness
-
-      TOML_Expressions.Strict_Enums := Strict_Before;
-
       --  Check for remaining keys, which must be erroneous:
       return From.Report_Extra_Keys;
-   exception
-      when E : others =>
-         TOML_Expressions.Strict_Enums := Strict_Before;
-
-         case Source is
-            when Manifest.Index =>
-               raise Program_Error with
-               Errors.Set
-                 ("Cannot load manifest " & This.Name_Str &
-                    " from index with proper version: ", E);
-            when Manifest.Local =>
-               raise Checked_Error with
-               Errors.Set
-                 ("Cannot load manifest " & This.Name_Str &
-                    ", please review contents: ", E);
-         end case;
    end From_TOML;
 
    -------------------
@@ -787,7 +783,6 @@ package body Alire.Releases is
    is
       package APL renames Alire.Properties.Labeled;
       use all type Alire.Properties.Labeled.Cardinalities;
-      use all type Alire.Requisites.Tree;
       use TOML_Adapters;
       Root : constant TOML.TOML_Value := R.Properties.To_TOML;
    begin
@@ -850,7 +845,7 @@ package body Alire.Releases is
 
       --  Available
       if R.Available.Is_Empty or else
-         R.Available = Alire.Requisites.Booleans.Always_True
+         R.Available.Value.Is_Available
       then
          null; -- Do nothing, do not pollute .toml file
       else
@@ -883,7 +878,11 @@ package body Alire.Releases is
         "version: " & Utils.YAML.YAML_Stringify (R.Version_Image) & ASCII.LF &
         "short_description: " & Utils.YAML.YAML_Stringify (R.Description) &
         ASCII.LF &
-        "dependencies: " & R.Dependencies.To_YAML;
+        "dependencies: " & R.Dependencies.To_YAML & ASCII.LF &
+        "configuration_variables: " &
+           Props_To_YAML (R.Config_Variables) & ASCII.LF &
+        "configuration_values: " &
+           Props_To_YAML (R.Config_Settings) & ASCII.LF;
    end To_YAML;
 
    -------------
@@ -910,9 +909,7 @@ package body Alire.Releases is
        Dependencies => R.Dependencies.Evaluate (P),
        Forbidden    => R.Forbidden.Evaluate (P),
        Properties   => R.Properties.Evaluate (P),
-       Available    => (if R.Available.Check (P)
-                        then Requisites.Booleans.Always_True
-                        else Requisites.Booleans.Always_False));
+       Available    => R.Available.Evaluate (P));
 
    ----------------------
    -- Long_Description --
