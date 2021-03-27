@@ -616,7 +616,8 @@ package body Alire.Publish is
             Ada.Directories.Copy_File (TTY.URL (Archive), Remote_URL);
 
             Context.Origin := Origins.New_Source_Archive
-              (Utils.Trim (Remote_URL), -- remove unwanted extra whitespaces
+              ("file://" & Utils.Trim (Remote_URL), -- remove unwanted extra
+               --  whitespaces
                Ada.Directories.Simple_Name (Archive));
          end;
 
