@@ -1,6 +1,9 @@
+with Alire.Conditional;
+with Alire.Dependencies;
 with Alire.Releases;
 with Alire.Solutions.Diffs;
 with Alire.Pinning;
+with Alire.URI;
 with Alire.Utils.TTY;
 with Alire.Utils.User_Input;
 
@@ -175,16 +178,37 @@ package body Alr.Commands.Pin is
 
          elsif Cmd.URL.all /= "" then
 
-            --  Pin to dir
+            --  Pin to remote commit
 
-            Cmd.Requires_Full_Index; -- Next statement recomputes a solution
+            if Cmd.Commit.all /= ""
+              or else Alire.URI.Is_HTTP_Or_Git (Cmd.URL.all)
+            then
+               New_Sol := Cmd.Root.Pinned_To_Remote
+                 (Dependency  => Alire.Conditional.New_Dependency
+                    (Alire.Dependencies.From_String (Argument (1))),
+                  URL         => Cmd.URL.all,
+                  Commit      => Cmd.Commit.all,
+                  Must_Depend => True)
+                 .Solution;
+            else
 
-            New_Sol := Alire.Pinning.Pin_To
-              (+Argument (1),
-               Cmd.URL.all,
-               Cmd.Root.Release.Dependencies,
-               Platform.Properties,
-               Old_Sol);
+               --  Pin to dir
+
+               if not Alire.Utils.User_Input.Approve_Dir (Cmd.URL.all) then
+                  Trace.Info ("Abandoned by user.");
+                  return;
+               end if;
+
+               Cmd.Requires_Full_Index; -- Next statement recomputes a solution
+
+               New_Sol := Alire.Pinning.Pin_To
+                 (+Argument (1),
+                  Cmd.URL.all,
+                  Cmd.Root.Release.Dependencies,
+                  Platform.Properties,
+                  Old_Sol);
+
+            end if;
 
             --  Report crate detection at target destination
 
@@ -226,10 +250,12 @@ package body Alr.Commands.Pin is
       .New_Line
       .Append ("Specify a single crate to modify its pin.")
       .New_Line
-      .Append ("Use the --use <PATH> switch to "
-               & " force alr to use the PATH target"
-               & " to fulfill a dependency locally"
-               & " instead of looking for indexed releases.")
+      .Append ("Use the --use <PATH|URL> switch to"
+               & " use the target to fulfill a dependency locally"
+               & " instead of looking for indexed releases."
+               & " An optional reference can be specified with --commit;"
+               & " the pin will be frozen at the commit currently matching"
+               & " the reference.")
      );
 
    --------------------
@@ -255,10 +281,18 @@ package body Alr.Commands.Pin is
 
       Define_Switch
         (Config      => Config,
+         Output      => Cmd.Commit'Access,
+         Long_Switch => "--commit=",
+         Argument    => "REF",
+         Help        => "Reference to be retrieved from repository");
+
+      Define_Switch
+        (Config      => Config,
          Output      => Cmd.URL'Access,
          Long_Switch => "--use=",
-         Argument    => "PATH",
-         Help        => "Use a directory to fulfill a dependency");
+         Argument    => "PATH|URL",
+         Help        =>
+           "Use a directory or repository to fulfill a dependency");
    end Setup_Switches;
 
 end Alr.Commands.Pin;

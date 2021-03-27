@@ -6,6 +6,7 @@ with Alire.Dependencies.Containers;
 with Alire.Dependencies.Diffs;
 with Alire.Dependencies.Graphs;
 with Alire.Index;
+with Alire.Roots.Optional;
 with Alire.Root;
 with Alire.Solutions.Diffs;
 with Alire.Utils.Tables;
@@ -287,6 +288,59 @@ package body Alire.Solutions is
       end case;
    end Is_Better;
 
+   -------------
+   -- Linking --
+   -------------
+
+   function Linking (This  : Solution;
+                     Crate : Crate_Name;
+                     Link  : Externals.Softlinks.External)
+                     return Solution
+   is
+      Linked_Root : constant Roots.Optional.Root :=
+                      Roots.Optional.Detect_Root (Link.Path);
+   begin
+
+      --  Recursively find any other links
+
+      return Result : Solution := (Solved       => True,
+                                   Dependencies =>
+                                     This.Dependencies.Including
+                                       (This.State (Crate).Linking (Link)))
+      do
+         if Linked_Root.Is_Valid and then Linked_Root.Value.Has_Lockfile then
+            declare
+               Linked_Solution : Solution renames Linked_Root.Value.Solution;
+            begin
+
+               --  Go through any links in the linked release
+
+               for Dep of Linked_Solution.Links loop
+                  declare
+
+                     --  Create the new link for our own solution, composing
+                     --  relative paths when possible.
+
+                     New_Link : constant Externals.Softlinks.External :=
+                                  Linked_Solution
+                                    .State (Dep.Crate)
+                                    .Link.Relocate (From => Link.Path);
+                  begin
+
+                     --  We may or not already depend on the transitively
+                     --  linked release. Just in case, we add the dependency
+                     --  before the link.
+
+                     Result := Result.Depending_On (Dep)
+                                     .Linking (Crate => Dep.Crate,
+                                               Link  => New_Link);
+                  end;
+               end loop;
+            end;
+         end if;
+      end return;
+   end Linking;
+
    ------------------
    -- New_Solution --
    ------------------
@@ -357,19 +411,28 @@ package body Alire.Solutions is
          Trace.Log ("Dependencies (solution):", Level);
 
          for Rel of This.Releases loop
-            Trace.Log ("   " & Rel.Milestone.TTY_Image
-                       & (if This.State (Rel.Name).Is_Pinned or else
-                             This.State (Rel.Name).Is_Linked
-                         then TTY.Emph (" (pinned)")
-                         else "")
-                       & (if Detailed
-                         then " (origin: "
-                             & (if This.State (Rel.Name).Is_Linked
-                                then TTY.URL (This.State (Rel.Name).Link.Path)
-                                else Utils.To_Lower_Case (Rel.Origin.Kind'Img))
-                             & ")"
-                         else ""),
-                       Level);
+            declare
+               Dep : Dependencies.States.State renames This.State (Rel.Name);
+            begin
+               Trace.Log
+                 ("   "
+                  & Rel.Milestone.TTY_Image
+                  & (if Dep.Is_Pinned or else Dep.Is_Linked
+                     then TTY.Emph (" (pinned)")
+                     else "")
+                  & (if Detailed
+                     then " (origin: "
+                          & (if Dep.Is_Linked
+                             then TTY.URL (Dep.Link.Path)
+                                  & (if Dep.Link.Is_Remote
+                                     then " from "
+                                         & Dep.Link.Remote.TTY_URL_With_Commit
+                                     else "") -- no remote
+                             else Utils.To_Lower_Case (Rel.Origin.Kind'Img))
+                          & ")" -- origin completed
+                     else ""),   -- no details
+                  Level);
+            end;
          end loop;
       end if;
 
@@ -500,6 +563,9 @@ package body Alire.Solutions is
                Table
                  .Append (TTY.Name (Dep.Crate))
                  .Append (TTY.Version ("file:" & Dep.Link.Path))
+                 .Append (if Dep.Link.Is_Remote
+                          then Dep.Link.Remote.TTY_URL_With_Commit
+                          else "")
                  .New_Row;
             elsif Dep.Is_Pinned then
                Table

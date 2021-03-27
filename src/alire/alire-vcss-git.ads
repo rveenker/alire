@@ -22,6 +22,21 @@ package Alire.VCSs.Git is
                    return Outcome;
 
    not overriding
+   function Clone (This   : VCS;
+                   From   : URL;
+                   Into   : Directory_Path;
+                   Branch : String)
+                   return Outcome;
+   --  Specify a branch to check out after cloning
+
+   not overriding
+   function Remote_Commit (This : VCS;
+                           From : URL;
+                           Ref  : String := "HEAD") return String;
+   --  Returns the commit matching Ref by ls-remote. If none, returns "". If
+   --  several match, Checked_Error.
+
+   not overriding
    function Revision_Commit (This   : VCS;
                              Repo   : Directory_Path;
                              Rev    : String)

@@ -9,7 +9,7 @@ with Simple_Logging;
 
 package Alire with Preelaborate is
 
-   Version : constant String := "1.1.0-dev";
+   Version : constant String := "1.1.0-dev+0f603c29";
    --  1.1.0-dev: begin post-1.0 changes
    --  1.0.0:     no changes since rc3
    --  1.0.0-rc3: added help colors PR
@@ -113,7 +113,7 @@ package Alire with Preelaborate is
    --  Base type for paths in Alire. These paths are always platform-dependent
    --  and can be used directly with filesystem functions.
 
-   subtype Portable_Path is String with
+   type Portable_Path is new String with
      Dynamic_Predicate => (for all Char of Portable_Path => Char /= '\');
    --  A portable path always uses forward slashes. For use in the current
    --  platform, it should be adapted first.
@@ -248,11 +248,21 @@ package Alire with Preelaborate is
    procedure Log_Exception (E     : Ada.Exceptions.Exception_Occurrence;
                             Level : Simple_Logging.Levels := Debug);
 
-   procedure Log_Info (Text : String; Level : Trace.Levels := Info);
+   --  Feedback-oriented commands for one-line feedback with symbol prefix:
+
+   procedure Put_Info (Text : String; Level : Trace.Levels := Info);
    --  Prepend Text with a blue "🛈", or "Note: " & if no color/tty.
 
-   procedure Log_Success (Text : String; Level : Trace.Levels := Info);
+   procedure Put_Warning (Text : String; Level : Trace.Levels := Info);
+   --  Prepend Text with a yellow "⚠", or "Warning: " if no color/tty
+
+   procedure Put_Success (Text : String; Level : Trace.Levels := Info);
    --  Prepend Text with a green check mark, or "Success:" if no color/tty.
+
+   procedure Put_Failure (Text : String; Level : Trace.Levels := Info);
+   --  Prepend Text with a red "✗", or "Failed:" if no color/tty. Intended as
+   --  the opposite of Put_Success when it makes sense to continue, albeit
+   --  briefly, without emitting a final error with Raise_Checked_Error.
 
 private
 

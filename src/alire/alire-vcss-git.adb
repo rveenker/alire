@@ -6,6 +6,8 @@ with Alire.Utils.TTY;
 
 package body Alire.VCSs.Git is
 
+   subtype Git_Commit is String (1 .. 40);
+
    -------------
    -- Run_Git --
    -------------
@@ -67,12 +69,28 @@ package body Alire.VCSs.Git is
                    From : URL;
                    Into : Directory_Path)
                    return Outcome
+   is (This.Clone (From, Into, Branch => ""));
+
+   -----------
+   -- Clone --
+   -----------
+
+   not overriding
+   function Clone (This   : VCS;
+                   From   : URL;
+                   Into   : Directory_Path;
+                   Branch : String)
+                   return Outcome
    is
       pragma Unreferenced (This);
       Extra : constant String_Vector :=
-        Empty_Vector & (if Log_Level < Trace.Info
-                        then "-q"
-                        else "--progress");
+                Empty_Vector
+                & (if Log_Level < Trace.Info
+                   then "-q"
+                   else "--progress")
+                & (if Branch /= ""
+                   then Empty_Vector & "--branch" & Branch
+                   else Empty_Vector);
    begin
       Trace.Detail ("Checking out [git]: " & From);
 
@@ -223,6 +241,60 @@ package body Alire.VCSs.Git is
          return Output.First_Element;
       end if;
    end Remote;
+
+   -------------------
+   -- Remote_Commit --
+   -------------------
+
+   not overriding
+   function Remote_Commit (This : VCS;
+                           From : URL;
+                           Ref  : String := "HEAD") return String
+   is
+      Output : constant Utils.String_Vector :=
+                 Run_Git_And_Capture (Empty_Vector & "ls-remote" & From);
+   begin
+      --  Sample output from git (space is tab):
+      --  95818710c1a2bea0cbfa617a67972fe984761227        HEAD
+      --  b0825ac9373ed587394cf5e7ecf51fd7caf9290a        refs/heads/feat/cache
+      --  95818710c1a2bea0cbfa617a67972fe984761227        refs/heads/master
+      --  a917c31c47a8bd0155c402f692b63bd77e53bae7        refs/pull/1/head
+      --  22cb794ed99dfe6cbb0541af558ada1d2ed8fdbe        refs/tags/v0.1
+      --  ae6fdd0711bb3ca2c1e2d1d18caf7a1b82a11f0a        refs/tags/v0.1^{}
+      --  7376b76f23ab4421fbec31eb616d767edbec7343        refs/tags/v0.2
+
+      --  Prepare Ref to make it less ambiguous
+
+      if Ref = "HEAD" or else Ref = "" then
+         return This.Remote_Commit (From, ASCII.HT & "HEAD");
+      elsif Ref (Ref'First) not in '/' | ASCII.HT then
+         return This.Remote_Commit (From, '/' & Ref);
+      end if;
+
+      --  Once here is reached, the Ref is ready for comparison
+
+      declare
+         Not_Found : constant Git_Commit := (others => 'x');
+         Result    : Git_Commit := Not_Found;
+      begin
+         for Line of Output loop
+            if Ends_With (Line, Ref) then
+               if Result = Not_Found then
+                  Result := Head (Line, ASCII.HT);
+               else
+                  Raise_Checked_Error ("Reference is ambiguous: "
+                                       & TTY.Emph (Ref));
+               end if;
+            end if;
+         end loop;
+
+         if Result = Not_Found then
+            return "";
+         else
+            return Result;
+         end if;
+      end;
+   end Remote_Commit;
 
    ------------
    -- Status --
