@@ -633,7 +633,7 @@ package body Alire.Publish is
                Trace.Always ("The URL is: " & TTY.URL (Remote_URL));
 
                Context.Origin := Origins.New_Source_Archive
-                 (Remote_URL,
+                 (Utils.Trim (Remote_URL), -- remove unwanted extra whitespaces
                   Ada.Directories.Simple_Name (Archive));
                --  This origin creation may raise if URL is improper
 
