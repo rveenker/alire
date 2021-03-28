@@ -487,7 +487,6 @@ package body Alire.Publish is
 
    procedure Prepare_Archive (Context : in out Data) is
       use Utils;
-      use type Alire.Platforms.Distributions;
       Target_Dir : constant Relative_Path :=
                      Paths.Working_Folder_Inside_Root / "archives";
       Release    : constant Releases.Release :=
@@ -500,9 +499,6 @@ package body Alire.Publish is
                                                With_Extension => False);
       Git        : constant VCSs.Git.VCS := VCSs.Git.Handler;
       Is_Repo    : constant Boolean := Git.Is_Repository (Base_Path (Context));
-      Is_Windows : constant Boolean :=
-                     GNATCOLL.OS.Constants.OS in GNATCOLL.OS.Windows
-                     and Alire.Platform.Distribution /= Alire.Platforms.Msys2;
       Archive    : constant Relative_Path :=
                      Target_Dir
                        / (Milestone
@@ -535,13 +531,15 @@ package body Alire.Publish is
       -----------------
 
       procedure Tar_Archive is
+         use type Alire.Platforms.Distributions;
       begin
          pragma Warnings (Off, "condition is always");
          --  To silence our below check for macOS
 
          OS_Lib.Subprocess.Checked_Spawn
            ("tar",
-            (if Is_Windows
+            (if GNATCOLL.OS.Constants.OS in GNATCOLL.OS.Windows
+                 and Alire.Platform.Distribution /= Alire.Platforms.Msys2
              then Empty_Vector
                   & "-C" & ".." -- Change to the parent directory
                   & "-czf"
@@ -561,7 +559,8 @@ package body Alire.Publish is
                     & String'("-s,^./," & Milestone & "/,")
                     --  Prepend empty milestone dir as required for our tars
                     & "."
-              elsif Is_Windows
+              elsif GNATCOLL.OS.Constants.OS in GNATCOLL.OS.Windows
+                and Alire.Platform.Distribution /= Alire.Platforms.Msys2
               then Empty_Vector
                     & "--exclude=*.git"
                     & "--exclude=*.hg"
@@ -605,18 +604,16 @@ package body Alire.Publish is
       if Ada.Directories.Exists (+Context.Path) then
          declare
             Remote_URL : constant String :=
-                           +(Context.Path) & (if Is_Windows then "/" else "") &
+                           +(Context.Path) & '\' &
                            Milestone
                            & (if Is_Repo
                               then ".tgz"
                               else ".tbz2");
          begin
-            Trace.Always ("Copying archive " &
-                            Ada.Directories.Full_Name (Archive) &
+            Trace.Always ("Copying archive " & TTY.URL (Archive) &
                             " to " & Remote_URL);
 
-            Ada.Directories.Copy_File (Ada.Directories.Full_Name (Archive),
-                                       Remote_URL);
+            Ada.Directories.Copy_File (TTY.URL (Archive), Remote_URL);
 
             Context.Origin := Origins.New_Source_Archive
               ("file://" & Utils.Trim (Remote_URL), -- remove unwanted extra
