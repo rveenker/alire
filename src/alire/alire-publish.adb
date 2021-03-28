@@ -604,7 +604,7 @@ package body Alire.Publish is
       if Ada.Directories.Exists (+Context.Path) then
          declare
             Remote_URL : constant String :=
-                           +(Context.Path) & '\' &
+                           +(Context.Path) & '/' &
                            Milestone
                            & (if Is_Repo
                               then ".tgz"
