@@ -504,7 +504,7 @@ package body Alire.Publish is
                        / (Milestone
                           & (if Is_Repo
                              then ".tgz"
-                             else ".tbz2"));
+                             else ".tar.tbz2"));
       use Utils.User_Input;
 
       -----------------
@@ -608,7 +608,7 @@ package body Alire.Publish is
                            Milestone
                            & (if Is_Repo
                               then ".tgz"
-                              else ".tbz2");
+                              else ".tar.tbz2");
          begin
             Trace.Always ("Copying archive " & TTY.URL (Archive) &
                             " to " & Remote_URL);
