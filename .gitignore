@@ -11,10 +11,11 @@
 .*sw?
 
 /alire/
-bin
-lib
-obj
+bin/
+/config/
+lib/
+obj/
+out/
 stress/*/
-venv
-
-testsuite/out
+/testsuite/out/
+venv/
