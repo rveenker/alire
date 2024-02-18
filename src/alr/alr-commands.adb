@@ -43,9 +43,10 @@ with Alr.Commands.Update;
 with Alr.Commands.Version;
 with Alr.Commands.Withing;
 
+with Alr.Commands.Topics.Aliases;
 with Alr.Commands.Topics.Naming_Convention;
 with Alr.Commands.Topics.Toolchains;
-with Alr.Commands.Topics.Aliases;
+with Alr.Commands.Topics.Upgrading_Alr;
 
 with GNAT.OS_Lib;
 
@@ -589,7 +590,13 @@ package body Alr.Commands is
          Cmd.Requires_Workspace;
       end if;
 
-      return Cmd.Optional_Root.Value;
+      return R : constant Alire.Roots.Optional.Reference :=
+        (Ptr => Cmd.Optional_Root.Value.Ptr.all'Unrestricted_Access);
+      --  Workaround for bug (?) in GNAT 11 about dangling pointers. It should
+      --  simply be:
+      --  return Cmd.Optional_Root.Value;
+      --  Also, the 'Unrestricted is needed by GNAT CE 2020, it can be simply
+      --  'Unchecked in later versions.
    end Root;
 
    ---------
@@ -660,8 +667,9 @@ begin
    Sub_Cmd.Register ("Testing", new Test.Command);
 
    -- Help topics --
+   Sub_Cmd.Register (new Topics.Aliases.Topic);
    Sub_Cmd.Register (new Topics.Naming_Convention.Topic);
    Sub_Cmd.Register (new Topics.Toolchains.Topic);
-   Sub_Cmd.Register (new Topics.Aliases.Topic);
+   Sub_Cmd.Register (new Topics.Upgrading_Alr.Topic);
 
 end Alr.Commands;
