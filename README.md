@@ -4,7 +4,7 @@
 [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/ada-lang/Alire)
 [![Gitpod ready](https://img.shields.io/badge/Gitpod-ready-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/alire-project/alire)
 
-# ALR #
+# ALR
 
 ALIRE: Ada LIbrary REpository.
 
@@ -12,13 +12,13 @@ A catalog of ready-to-use Ada libraries plus a command-line tool (`alr`) to
 obtain, build, and incorporate them into your own projects. It aims to fulfill
 a similar role to Rust's `cargo` or OCaml's `opam`.
 
-### Caveat emptor ###
+### Caveat emptor
 
 Documentation at this time is a work in progress. Expect further efforts in
 this direction until this warning is removed. Check the latest information at
 https://alire.ada.dev/
 
-## TL;DR ##
+## TL;DR
 
 Available for Linux/macOS/Windows/FreeBSD.
 
@@ -26,11 +26,11 @@ Download the latest stable version from the [Releases](https://github.com/alire-
 
 If, instead, you want to test the latest development version, see [Building from sources](#building-from-sources) or, if you already have a recent `alr` in your system, [Building with `alr`](#building-with-alr).
 
-## Installation and First Steps ##
+## Installation and First Steps
 
 See the [Getting Started](doc/getting-started.md) guide.
 
-## Building from sources ##
+## Building from sources
 
 The build process of `alr` is straighforward and depends only on a recent GNAT Ada 2012 compiler. All dependencies are included as submodules. A project file (`alr_env.gpr`) is provided to drive the build with all necessary configuration (which is also valid for editing with GNAT Studio).
 
@@ -39,8 +39,8 @@ The ALIRE_OS environment variable must be set to the OS for which `alr` is being
 Follow these steps:
 
 1. Clone the repository: `git clone --recurse-submodules https://github.com/alire-project/alire.git`
-1. Enter the cloned repository folder.
-1. Build the executable:
+2. Enter the cloned repository folder.
+3. Build the executable:
    * if you have Bash on your system: `dev/build.sh`
    * if you don't have Bash on your system: `ALIRE_OS=<one of: freebsd, linux, macos, windows> gprbuild -j0 -p -P alr_env`
 
@@ -58,7 +58,7 @@ configure the environment.
 The master branch should normally be able to build itself in this fashion, as
 this is one of our integration tests.
 
-## Design principles ##
+## Design principles
 
 alr is tailored to userspace, in a similar way to Python's virtualenv. A
 project or workspace will contain all its dependencies.
@@ -78,7 +78,7 @@ the user from concerns about installation paths. The user simply adds the used
 projects to its own project GPR file with their simple name. You can check the
 environment `alr` is using with `alr printenv`.
 
-## Supported platforms ##
+## Supported platforms
 
 Alire can be built on Linux, macOS, Windows, and FreeBSD.
 

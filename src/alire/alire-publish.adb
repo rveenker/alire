@@ -25,13 +25,14 @@ with Alire.TOML_Index;
 with Alire.TOML_Keys;
 with Alire.TOML_Load;
 with Alire.User_Pins.Maps;
-with Alire.Utils.Tools;
 with Alire.Utils.TTY;
 with Alire.Utils.User_Input.Query_Config;
 with Alire.VCSs.Git;
 with Alire.VFS;
 
 with CLIC.User_Input;
+
+with GNATCOLL.OS.Constants;
 
 with Semantic_Versioning;
 
@@ -727,13 +728,16 @@ package body Alire.Publish is
 
       Put_Success ("Source archive created successfully.");
 
-      declare
-
-         --------------
-         -- Is_Valid --
-         --------------
-
-         function Is_Valid (Remote_URL : String) return Boolean is
+      --  Test if we can access the alire index. If not, ask the user to
+      --  copy the tarball to it's destination
+      if Ada.Directories.Exists (+Context.Path) then
+         declare
+            Remote_URL : constant String :=
+                           +(Context.Path) & '/' &
+                         Milestone
+                           & (if Is_Repo
+                              then ".tgz"
+                              else ".tar.tbz2");
          begin
             Trace.Always ("Copying archive " & TTY.URL (Archive) &
                             " to " & Remote_URL);
