@@ -1,13 +1,13 @@
 with Ada.Directories;
 with Ada.Text_IO;
 
-with Alire.Config.Builtins;
+with Alire.Settings.Builtins;
 with Alire.Crates;
 with Alire.Directories;
 with Alire.Defaults;
 with Alire.Errors;
 with Alire.Flags;
-with Alire.Origins.Deployers;
+with Alire.Origins.Deployers.System;
 with Alire.Paths;
 with Alire.Properties.Bool;
 with Alire.Properties.Scenarios;
@@ -85,7 +85,7 @@ package body Alire.Releases is
       Newline    : constant String := ASCII.LF & "   ";
    begin
       for Dep of This.Flat_Dependencies loop
-         if Config.Builtins.Warning_Caret.Get
+         if Settings.Builtins.Warning_Caret.Get
            and then
            AAA.Strings.Contains (Dep.Versions.Image, "^0")
          then
@@ -98,7 +98,7 @@ package body Alire.Releases is
                & "The suspicious dependency is: " & TTY.Version (Dep.Image)
                & Newline
                & "You can disable this warning by setting the option "
-               & TTY.Emph (Config.Builtins.Warning_Caret.Key) & " to false.",
+               & TTY.Emph (Settings.Builtins.Warning_Caret.Key) & " to false.",
                Warnings.Caret_Or_Tilde);
             return True;
          end if;
@@ -201,8 +201,8 @@ package body Alire.Releases is
            & (case R.Origin.Kind is
                  when Git | Hg => R.Origin.Short_Unique_Id,
                  when SVN => R.Origin.Commit,
-                 when others => raise Program_Error
-                   with "monorepo folder only applies to VCS origins");
+                 when others => raise Program_Error with
+                   "monorepo folder only applies to VCS origins");
       end Monorepo_Path;
 
       ------------------
@@ -316,23 +316,34 @@ package body Alire.Releases is
          Trace.Detail ("Skipping checkout of already available " &
                          This.Milestone.Image);
 
+      elsif This.Origin.Kind not in Origins.Deployable_Kinds then
+         Was_There := True;
+         Trace.Detail ("External requires no deployment for " &
+                         This.Milestone.Image);
+
+      elsif This.Origin.Is_System
+        and then Origins.Deployers.System.Already_Installed (This.Origin)
+      then
+         Was_There := True;
+         Trace.Detail ("Skipping install of already available system origin " &
+                         This.Milestone.Image);
+
       else
          Was_There := False;
          Put_Info ("Deploying " & This.Milestone.TTY_Image & "...");
          Alire.Origins.Deployers.Deploy (This, Folder).Assert;
-
-         --  For deployers that do nothing, we ensure the folder exists so all
-         --  dependencies leave a trace in the cache/dependencies folder, and
-         --  a place from where to run their actions by default.
-
-         Ada.Directories.Create_Path (Folder);
-
-         --  Backup a potentially packaged manifest, so our authoritative
-         --  manifest from the index is always used.
-
-         Backup_Upstream_Manifest;
-
       end if;
+
+      --  For deployers that do nothing, we ensure the folder exists so all
+      --  dependencies leave a trace in the cache/dependencies folder, and
+      --  a place from where to run their actions by default.
+
+      Ada.Directories.Create_Path (Folder);
+
+      --  Backup a potentially packaged manifest, so our authoritative
+      --  manifest from the index is always used.
+
+      Backup_Upstream_Manifest;
 
       --  Create manifest if requested
 
@@ -906,6 +917,42 @@ package body Alire.Releases is
       end loop;
 
       return False;
+   end Property_Contains;
+
+   -----------------------
+   -- Property_Contains --
+   -----------------------
+
+   function Property_Contains (R : Release; Str : String)
+                               return AAA.Strings.Set
+   is
+      Results : AAA.Strings.Set;
+      use AAA.Strings;
+
+      Search : constant String := To_Lower_Case (Str);
+   begin
+      for P of Conditional.Enumerate (R.Properties) loop
+         declare
+            Image : constant String := P.Image;
+         begin
+            if Contains (Image, ":") then
+               declare
+                  Prop  : constant String := Head (Image, ':');
+                  Value : constant String := Trim (Tail (Image, ':'));
+               begin
+                  if Contains (To_Lower_Case (Value), Search) then
+                     Results.Include (Prop);
+                  end if;
+               end;
+            else
+               if Contains (To_Lower_Case (Image), Search) then
+                  Results.Include (Image);
+               end if;
+            end if;
+         end;
+      end loop;
+
+      return Results;
    end Property_Contains;
 
    -------------------
