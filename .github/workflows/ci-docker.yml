@@ -28,12 +28,22 @@ jobs:
 
     steps:
     - name: Check out repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         submodules: true
 
+    - name: OS information for ${{ matrix.tag }}
+      uses: mosteo-actions/docker-run@v2
+      with:
+        image: ghcr.io/alire-project/docker/gnat:${{matrix.tag}}
+        command: |
+          lsb_release -a || \
+          cat /etc/os-release || \
+          cat /etc/system-release || \
+          echo "No lsb_release information"
+
     - name: Run test script (${{ matrix.tag }})
-      uses: mosteo-actions/docker-run@v1
+      uses: mosteo-actions/docker-run@v2
       with:
         image: ghcr.io/alire-project/docker/gnat:${{matrix.tag}}
         command: scripts/ci-github.sh

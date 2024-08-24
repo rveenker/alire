@@ -51,9 +51,11 @@ package body Alire.Roots.Optional is
                   return This : constant Root :=
                     Outcome_Success
                       (Roots.New_Root
-                         (R    => Releases.From_Manifest (Crate_File,
-                                                          Manifest.Local,
-                                                          Strict => True),
+                         (R    => Releases.From_Manifest
+                            (Crate_File,
+                             Manifest.Local,
+                             Strict    => True,
+                             Root_Path => Directories.Current),
                           Path => Directories.Current,
                           Env  => Alire.Root.Platform_Properties))
                   do
@@ -134,6 +136,15 @@ package body Alire.Roots.Optional is
       return Ref : constant Reference :=
         Reference'(Ptr => This.Data.Value'Unrestricted_Access);
    end Value;
+
+   -------------
+   -- Discard --
+   -------------
+
+   procedure Discard (This : in out Root) is
+   begin
+      This.Data := (Status => Outside);
+   end Discard;
 
    ---------------------
    -- Outcome_Failure --

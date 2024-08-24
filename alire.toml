@@ -21,7 +21,9 @@ aaa = "~0.2.7"
 ada_toml = "~0.3"
 ajunitgen = "^1.0.1"
 ansiada = "^1.0"
+c_strings = "^1.0"
 clic = "~0.3"
+den = "~0.1"
 dirty_booleans = "~0.1"
 diskflags = "~0.1"
 gnatcoll = "^21"
@@ -42,6 +44,7 @@ CLIC_LIBRARY_TYPE="static"
 # Building alr requires the explicit setting of this variable
 [gpr-set-externals."case(os)"]
 freebsd = { ALIRE_OS = "freebsd" }
+openbsd = { ALIRE_OS = "openbsd" }
 linux   = { ALIRE_OS = "linux" }
 macos   = { ALIRE_OS = "macos" }
 windows = { ALIRE_OS = "windows" }
@@ -49,25 +52,34 @@ windows = { ALIRE_OS = "windows" }
 
 # Some dependencies require precise versions during the development cycle:
 [[pins]]
+
 [pins.aaa]
 url    = "https://github.com/mosteo/aaa"
-commit = "dff61d2615cc6332fa6205267bae19b4d044b9da"
+commit = "0c3b440ac183c450345d4a67d407785678779aae"
 
 [pins.ada_toml]
 url    = "https://github.com/mosteo/ada-toml"
 commit = "da4e59c382ceb0de6733d571ecbab7ea4919b33d"
 
+[pins.c_strings]
+url    = "https://github.com/mosteo/cstrings"
+commit = "e4d58ad90bf32bc44304197e5906a519f5a9a7bf"
+
 [pins.clic]
 url    = "https://github.com/alire-project/clic"
 commit = "56bbdc008e16996b6f76e443fd0165a240de1b13"
 
+[pins.den]
+url    = "https://github.com/mosteo/den"
+commit = "35d1f38395b93766dd64bca5901ce3b6a416ba1a"
+
 [pins.dirty_booleans]
 url    = "https://github.com/mosteo/dirty_booleans"
-branch = "alire"
+commit = "05c40d88ecfe109e575ec8b21dd6ffa2e61df1dc"
 
 [pins.diskflags]
 url    = "https://github.com/mosteo/diskflags"
-branch = "alire"
+commit = "60729edf31816aca0036b13b2794c39a9bd0172e"
 
 [pins.gnatcoll]
 url    = "https://github.com/alire-project/gnatcoll-core.git"
@@ -79,7 +91,7 @@ commit = "9a9c660f9c6f27f5ef75417e7fac7061dff14d78"
 
 [pins.semantic_versioning]
 url    = "https://github.com/alire-project/semantic_versioning"
-commit = "cc2148cf9c8934fb557b5ae49a3f7947194fa7ee"
+commit = "4861e32bd8a2f0df038d3ecc9a72b6381e7a34cc"
 
 [pins.simple_logging]
 url    = "https://github.com/alire-project/simple_logging"
@@ -87,7 +99,7 @@ commit = "3505dc645f3eef6799a486aae223d37e88cfc4d5"
 
 [pins.si_units]
 url    = "https://github.com/mosteo/si_units"
-branch = "alire"
+commit = "9329d2591b82440ccc859a53f1380ac07ea4194d"
 
 [pins.stopwatch]
 url    = "https://github.com/mosteo/stopwatch"
@@ -95,4 +107,27 @@ commit = "f607a63b714f09bbf6126de9851cbc21cf8666c9"
 
 [pins.toml_slicer]
 url    = "https://github.com/mosteo/toml_slicer"
-branch = "alire"
+commit = "3e5cbdb5673b85a1da6344a41764ef1cbafe3289"
+
+# To disable version updating, export ALR_VERSION_DONT_PATCH with any value
+
+# Before building, we add the commit to the version, for unique identification:
+[[actions]]
+[actions.'case(os)'.windows]
+type = "pre-build"
+command = ["pwsh", "scripts/version-patcher.ps1"]
+
+[actions.'case(os)'.'...']
+type = "pre-build"
+command = ["scripts/version-patcher.sh"]
+
+# Afterwards we leave an extra note, so people manually building don't use a
+# misleading commit.
+[[actions]]
+[actions.'case(os)'.windows]
+type = "post-build"
+command = ["pwsh", "scripts/version-patcher.ps1", "_or_later"]
+
+[actions.'case(os)'.'...']
+type = "post-build"
+command = ["scripts/version-patcher.sh", "_or_later"]

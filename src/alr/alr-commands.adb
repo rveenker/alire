@@ -23,6 +23,7 @@ with Alire.Toolchains;
 
 with Alr.Commands.Action;
 with Alr.Commands.Build;
+with Alr.Commands.Cache;
 with Alr.Commands.Clean;
 with Alr.Commands.Config;
 with Alr.Commands.Dev;
@@ -363,7 +364,7 @@ package body Alr.Commands is
          --  For workspaces created pre-lockfiles, or with older format,
          --  recreate:
 
-         case Lockfiles.Validity (Checked.Lock_File) is
+         case Lockfiles.Validity (Checked.Path, Checked.Lock_File) is
             when Lockfiles.Valid =>
                Trace.Debug ("Lockfile at " & Checked.Lock_File & " is valid");
 
@@ -677,6 +678,7 @@ begin
 
    -- Commands --
    Sub_Cmd.Register ("General", new Sub_Cmd.Builtin_Help);
+   Sub_Cmd.Register ("General", new Cache.Command);
    Sub_Cmd.Register ("General", new Settings.Command);
    Sub_Cmd.Register ("General", new Config.Command);
    Sub_Cmd.Register ("General", new Install.Command);

@@ -42,6 +42,7 @@ with TOML_Slicer;
 
 package body Alire.Publish is
 
+   package Adirs renames Ada.Directories;
    package Semver renames Semantic_Versioning;
 
    use all type UString;
@@ -391,7 +392,8 @@ package body Alire.Publish is
          Check_Release (Releases.From_Manifest
                           (Starting_Manifest (Context),
                            Alire.Manifest.Local,
-                           Strict => True));
+                           Strict    => True,
+                           Root_Path => Adirs.Full_Name (+Context.Path)));
          --  Will have raised if the release is not loadable or incomplete
       else
          declare
@@ -613,7 +615,8 @@ package body Alire.Publish is
 
    procedure Prepare_Archive (Context : in out Data) with
      Pre => Alire.Manifest.Is_Valid (Context.Options.Manifest,
-                                     Alire.Manifest.Local);
+                                     Alire.Manifest.Local,
+                                     Adirs.Full_Name (+Context.Path));
    --  Prepare a tar file either using git archive (if git repo detected) or
    --  plain tar otherwise.
 
@@ -623,9 +626,11 @@ package body Alire.Publish is
       Target_Dir : constant Relative_Path :=
                      Paths.Working_Folder_Inside_Root / "archives";
       Release    : constant Releases.Release :=
-                     Releases.From_Manifest (Context.Options.Manifest,
-                                             Alire.Manifest.Local,
-                                             Strict => True);
+                     Releases.From_Manifest
+                       (Context.Options.Manifest,
+                        Alire.Manifest.Local,
+                        Strict    => True,
+                        Root_Path => Adirs.Full_Name (+Context.Path));
       Milestone  : constant String :=
                      TOML_Index.Manifest_File (Release.Name,
                                                Release.Version,
@@ -823,7 +828,8 @@ package body Alire.Publish is
                     .From_Manifest
                       (Packaged_Manifest (Context),
                        Alire.Manifest.Local,
-                       Strict => True)
+                       Strict    => True,
+                       Root_Path => Adirs.Full_Name (+Context.Path))
                     .Replacing (Origin => Context.Origin);
    begin
       Check_Release (Release);

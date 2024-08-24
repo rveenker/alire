@@ -9,13 +9,33 @@ set -o nounset
 export PATH+=:${PWD}/bin
 
 # Import reusable bits
-pushd $( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+pushd "$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
     . ../dev/functions.sh
 popd
 
-# Build alr
-export ALIRE_OS=$(get_OS)
-gprbuild -j0 -p -P alr_env
+# Mark location safe to assuage git if necessary (happens under docker as we
+# run with a different user).
+if git status 2>&1 | grep -q "dubious ownership"; then
+   echo "Marking $PWD as safe for git"
+   git config --global --add safe.directory "$PWD"
+
+   # Change ownership and group to current user of everything in the testsuite,
+   # as we have there some pre-created git repositories that would fail too.
+   # These are copied to temporary locations by the test runner, so we cannot
+   # simply use the `git config` trick.
+   sudo chown -R $(id -u):$(id -g) testsuite
+fi
+
+# Patch version
+scripts/version-patcher.sh
+
+# Build alr if no argument is "build=false"
+if [[ " $* " == *" build=false "* ]]; then
+    echo "Skipping alr build, explicitly disabled via arguments"
+else
+    export ALIRE_OS=$(get_OS)
+    gprbuild -j0 -p -P alr_env
+fi
 
 # Disable distro detection if supported
 if [ "${ALIRE_DISABLE_DISTRO:-}" == "true" ]; then
@@ -31,15 +51,19 @@ echo GNAT VERSION:
 gnatls -v
 echo ............................
 
-echo ALR VERSION:
-alr version
+echo "ALR VERSION (at $(which alr)):"
+alr -d version
 echo ............................
 
 # Set up index if not default:
 if [ "${INDEX:-}" != "" ]; then
-    echo Setting default index to: $INDEX
+    echo Setting default index to: "$INDEX"
     alr index --name default --add "$INDEX"
 fi
+
+echo "ALR SETTINGS (global):"
+alr settings --global
+echo ............................
 
 echo ALR SEARCH:
 # List releases for the record
@@ -65,8 +89,8 @@ fi
 
 echo PYTHON installing testsuite dependencies...
 
-echo Python version: $($run_python --version)
-echo Pip version: $($run_pip --version)
+echo "Python version: $($run_python --version)"
+echo "Pip version: $($run_pip --version)"
 
 $run_pip install --upgrade -r requirements.txt
 echo Python search paths:

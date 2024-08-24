@@ -25,13 +25,8 @@ package body Alire.Origins.Deployers.System.Apt is
                     Valid_Exit_Codes => (0, 1), -- returned when not found
                     Err_To_Out       => True);
    begin
-      for Line of Output loop
-         if Line = "Status: install ok installed" then
-            return True;
-         end if;
-      end loop;
-
-      return False;
+      return
+        (for some Line of Output => Line = "Status: install ok installed");
    end Already_Installed;
 
    ------------
@@ -77,6 +72,19 @@ package body Alire.Origins.Deployers.System.Apt is
                   Trace.Debug
                     ("Unexpected version format, could not identify version");
                end if;
+            exception
+               --  We do not really want to disturb users for a problem
+               --  introduced externally by some new package version in the
+               --  underlying distro. This will make the problem harder to
+               --  detect, but eventually someone should notice that a package
+               --  is not being detected as intended.
+               when Constraint_Error | Semantic_Versioning.Malformed_Input =>
+                  Trace.Debug
+                    ("Unexpected error while parsing version from: "
+                     & Match & " in line " & Line & " in pkg "
+                     & This.Base.Package_Name);
+                  return Version_Outcomes.Outcome_Failure
+                    ("could not be detected", Report => False);
             end;
          end if;
       end loop;
