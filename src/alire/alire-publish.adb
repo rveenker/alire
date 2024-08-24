@@ -72,8 +72,8 @@ package body Alire.Publish is
                                 Root    : Roots.Optional.Root;
                                 Options : All_Options)
    is
-      --  Path is supplied by the user and may not be a good path. Root has
-      --  been attempted to be detected at Path.
+   --  Path is supplied by the user and may not be a good path. Root has
+   --  been attempted to be detected at Path.
       use all type Roots.Optional.States;
 
       ---------------
@@ -247,8 +247,8 @@ package body Alire.Publish is
       Index_On_Disk.Loading.Load_All (Strict => True).Assert;
       if Index.Exists (Release.Name, Release.Version) then
          Recoverable_User_Error
-            ("Target release " & Release.Milestone.TTY_Image
-             & " already exist in a loaded index");
+           ("Target release " & Release.Milestone.TTY_Image
+            & " already exist in a loaded index");
       end if;
 
       --  Present release information to user
@@ -263,8 +263,8 @@ package body Alire.Publish is
       if not Release.Pins.Is_Empty then
          Ada.Text_IO.New_Line;
          Trace.Warning ("The release manifest "
-                      & TTY.Warn ("contains pins that will be removed")
-                      & " in the published version.");
+                        & TTY.Warn ("contains pins that will be removed")
+                        & " in the published version.");
       end if;
 
       --  Detect missing recommended fields
@@ -350,10 +350,10 @@ package body Alire.Publish is
    --  Check that the sources we are trying to publish can be built
 
    procedure Check_Build (Context : in out Data) is
-      --  Enter the temporary as if it were a workspace (which it has to
-      --  be, as it contains the user manifest). Auto-update should retrieve
-      --  dependencies, and since we are not repackaging, there's no problem
-      --  with altering contents under alire or regenerating the lock file.
+   --  Enter the temporary as if it were a workspace (which it has to
+   --  be, as it contains the user manifest). Auto-update should retrieve
+   --  dependencies, and since we are not repackaging, there's no problem
+   --  with altering contents under alire or regenerating the lock file.
       Guard : Directories.Guard (Directories.Enter (Deploy_Path (Context)))
         with Unreferenced;
    begin
@@ -390,7 +390,7 @@ package body Alire.Publish is
    begin
       if Context.Options.Nonstandard_Manifest then
          Check_Release (Releases.From_Manifest
-                          (Starting_Manifest (Context),
+                        (Starting_Manifest (Context),
                            Alire.Manifest.Local,
                            Strict    => True,
                            Root_Path => Adirs.Full_Name (+Context.Path)));
@@ -523,7 +523,7 @@ package body Alire.Publish is
                              then Workspace.Value.Working_Folder
                              else "." / Paths.Working_Folder_Inside_Root)
                             / Paths.Release_Folder_Inside_Working_Folder
-                            / TOML_Index.Manifest_File (Name, Version);
+                              / TOML_Index.Manifest_File (Name, Version);
          Index_File     : File_Type;
       begin
          if Workspace.Is_Valid and then
@@ -576,7 +576,7 @@ package body Alire.Publish is
             if CLIC.User_Input.Query
               ("Do you want to continue onto submission to the online "
                & "community index?",
-               Valid => (Yes | No => True, others => False),
+               Valid   => (Yes | No => True, others => False),
                Default => Yes) = No
             then
                raise Early_Stop;
@@ -643,6 +643,9 @@ package body Alire.Publish is
                           & (if Is_Repo
                              then ".tgz"
                              else ".tbz2"));
+      --  We used to use tbz2 for locally tar'ed files, but that has an
+      --  implicit dependency on bzip2 that we are not managing yet, so for
+      --  now we err on the safe side of built-in tar gzip capabilities.
 
       -----------------
       -- Git_Archive --
@@ -701,11 +704,11 @@ package body Alire.Publish is
               & "--exclude=*.svn"
               & Ada.Directories.Simple_Name (Base_Path (Context))
               else Empty_Vector
-                    & "--exclude-backups"      -- exclude .#* *~ #*# patterns
-                    & "--exclude-vcs"          -- exclude .git, .hg, etc
-                    & "--exclude-vcs-ignores"  -- exclude from .gitignore, etc
-                    & String'("--transform=s,^./," & Milestone & "/,"))
-                    --  Prepend empty milestone dir as required for our tars
+              & "--exclude-backups"      -- exclude .#* *~ #*# patterns
+              & "--exclude-vcs"          -- exclude .git, .hg, etc
+              & "--exclude-vcs-ignores"  -- exclude from .gitignore, etc
+              & String'("--transform=s,^./," & Milestone & "/,"))
+            --  Prepend empty milestone dir as required for our tars
 
             & ".");
          pragma Warnings (On);
